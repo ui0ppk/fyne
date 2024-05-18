@@ -66,6 +66,12 @@ func (w *window) Resize(size fyne.Size) {
 	})
 }
 
+func (w *window) SetPosition(pos fyne.Position) {
+	w.requestedX = int(pos.X)
+	w.requestedY = int(pos.Y)
+	w.runOnMainWhenCreated(w.handlePosition)
+}
+
 func (w *window) FixedSize() bool {
 	return w.fixedSize
 }
@@ -156,6 +162,8 @@ func (w *window) doShow() {
 		if w.centered {
 			w.doCenterOnScreen() // lastly center if that was requested
 		}
+		
+		w.handlePosition()
 		view.Show()
 
 		// save coordinates

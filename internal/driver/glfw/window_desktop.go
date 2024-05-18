@@ -107,6 +107,7 @@ type window struct {
 	xpos, ypos                      int
 	width, height                   int
 	requestedWidth, requestedHeight int
+	requestedX, requestedY          int
 	shouldWidth, shouldHeight       int
 	shouldExpand                    bool
 
@@ -225,6 +226,15 @@ func (w *window) SetIcon(icon fyne.Resource) {
 
 func (w *window) SetMaster() {
 	w.master = true
+}
+
+
+func (w *window) handlePosition() {
+	w.viewLock.RLock()
+	view := w.viewport
+	w.viewLock.RUnlock()
+
+	view.SetPos(w.requestedX, w.requestedY)
 }
 
 func (w *window) fitContent() {

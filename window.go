@@ -23,7 +23,12 @@ type Window interface {
 	// SetPosition sets the position of the window to the requested position.
 	// The result may not be exactly as desired due to various desktop or
 	// platform constraints.
-	SetPosition(Position)
+	SetPosition(Position)	
+	
+	// GetPosition gets the current position of the window.
+	// The result may not be exactly as desired due to various desktop or
+	// platform constraints.
+	GetPosition() (int, int)
 	
 	// RequestFocus attempts to raise and focus this window.
 	// This should only be called when you are sure the user would want this window

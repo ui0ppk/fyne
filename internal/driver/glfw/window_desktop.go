@@ -234,7 +234,9 @@ func (w *window) handlePosition() {
 	view := w.viewport
 	w.viewLock.RUnlock()
 
+	if !w.centered {
 	view.SetPos(w.requestedX, w.requestedY)
+	}
 }
 
 func (w *window) fitContent() {

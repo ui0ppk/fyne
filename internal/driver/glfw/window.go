@@ -72,6 +72,11 @@ func (w *window) SetPosition(pos fyne.Position) {
 	w.runOnMainWhenCreated(w.handlePosition)
 }
 
+func (w *window) GetPosition() (int, int) {
+	return w.requestedX,
+	w.requestedY
+}
+
 func (w *window) FixedSize() bool {
 	return w.fixedSize
 }

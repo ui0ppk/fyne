@@ -51,6 +51,14 @@ func main() {
 		title.SetText(t.Title)
 		intro.SetText(t.Intro)
 
+		if t.Title == "Welcome" {
+			title.Hide()
+			intro.Hide()
+		} else {
+			title.Show()
+			intro.Show()
+		}
+
 		content.Objects = []fyne.CanvasObject{t.View(w)}
 		content.Refresh()
 	}
@@ -112,6 +120,12 @@ func makeMenu(a fyne.App, w fyne.Window) *fyne.MainMenu {
 		w.Resize(fyne.NewSize(440, 520))
 		w.Show()
 	}
+	showAbout := func() {
+		w := a.NewWindow("About")
+		w.SetContent(widget.NewLabel("About Fyne Demo app..."))
+		w.Show()
+	}
+	aboutItem := fyne.NewMenuItem("About", showAbout)
 	settingsItem := fyne.NewMenuItem("Settings", openSettings)
 	settingsShortcut := &desktop.CustomShortcut{KeyName: fyne.KeyComma, Modifier: fyne.KeyModifierShortcutDefault}
 	settingsItem.Shortcut = settingsShortcut
@@ -162,6 +176,7 @@ func makeMenu(a fyne.App, w fyne.Window) *fyne.MainMenu {
 	if !device.IsMobile() && !device.IsBrowser() {
 		file.Items = append(file.Items, fyne.NewMenuItemSeparator(), settingsItem)
 	}
+	file.Items = append(file.Items, aboutItem)
 	main := fyne.NewMainMenu(
 		file,
 		fyne.NewMenu("Edit", cutItem, copyItem, pasteItem, fyne.NewMenuItemSeparator(), findItem),
@@ -188,10 +203,6 @@ func makeTray(a fyne.App) {
 	}
 }
 
-func unsupportedTutorial(t tutorials.Tutorial) bool {
-	return !t.SupportWeb && fyne.CurrentDevice().IsBrowser()
-}
-
 func makeNav(setTutorial func(tutorial tutorials.Tutorial), loadPrevious bool) fyne.CanvasObject {
 	a := fyne.CurrentApp()
 
@@ -214,17 +225,9 @@ func makeNav(setTutorial func(tutorial tutorials.Tutorial), loadPrevious bool) f
 				return
 			}
 			obj.(*widget.Label).SetText(t.Title)
-			if unsupportedTutorial(t) {
-				obj.(*widget.Label).TextStyle = fyne.TextStyle{Italic: true}
-			} else {
-				obj.(*widget.Label).TextStyle = fyne.TextStyle{}
-			}
 		},
 		OnSelected: func(uid string) {
 			if t, ok := tutorials.Tutorials[uid]; ok {
-				if unsupportedTutorial(t) {
-					return
-				}
 				a.Preferences().SetString(preferenceCurrentTutorial, uid)
 				setTutorial(t)
 			}
@@ -238,10 +241,10 @@ func makeNav(setTutorial func(tutorial tutorials.Tutorial), loadPrevious bool) f
 
 	themes := container.NewGridWithColumns(2,
 		widget.NewButton("Dark", func() {
-			a.Settings().SetTheme(theme.DarkTheme())
+			a.Settings().SetTheme(&forcedVariant{Theme: theme.DefaultTheme(), variant: theme.VariantDark})
 		}),
 		widget.NewButton("Light", func() {
-			a.Settings().SetTheme(theme.LightTheme())
+			a.Settings().SetTheme(&forcedVariant{Theme: theme.DefaultTheme(), variant: theme.VariantLight})
 		}),
 	)
 

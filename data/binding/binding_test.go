@@ -8,7 +8,7 @@ import (
 )
 
 func syncMapLen(m *sync.Map) (n int) {
-	m.Range(func(_, _ interface{}) bool {
+	m.Range(func(_, _ any) bool {
 		n++
 		return true
 	})
@@ -60,4 +60,13 @@ func TestNewDataItemListener(t *testing.T) {
 	waitForItems()
 	fn.DataChanged()
 	assert.True(t, called)
+}
+
+func TestBindAnyWithNil(t *testing.T) {
+	a := NewUntyped()
+	a.Set(nil)
+	b := 1
+	a.Set(b)
+	var tr any = nil
+	a.Set(tr)
 }

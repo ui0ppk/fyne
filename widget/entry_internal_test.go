@@ -42,11 +42,15 @@ func TestEntry_DoubleTapped(t *testing.T) {
 	entry.DoubleTapped(ev)
 	assert.Equal(t, "quick", entry.SelectedText())
 
+	entry.doubleTappedAtUnixMillis = 0 // make sure we don't register a triple tap next
+
 	// select the whitespace after 'quick'
 	ev = getClickPosition("The quick", 0)
 	clickPrimary(entry, ev)
 	entry.DoubleTapped(ev)
 	assert.Equal(t, " ", entry.SelectedText())
+
+	entry.doubleTappedAtUnixMillis = 0
 
 	// select all whitespace after 'jumped'
 	ev = getClickPosition("jumped  ", 1)
@@ -275,7 +279,8 @@ func TestEntry_EraseSelection(t *testing.T) {
 	keyPress(&fyne.KeyEvent{Name: fyne.KeyRight})
 	keyPress(&fyne.KeyEvent{Name: fyne.KeyRight})
 
-	e.eraseSelection()
+	_ = e.Theme()
+	e.eraseSelectionAndUpdate()
 	e.updateText(e.textProvider().String(), false)
 	assert.Equal(t, "Testing\nTeng\nTesting", e.Text)
 	a, b := e.selection()
@@ -292,6 +297,7 @@ func TestEntry_CallbackLocking(t *testing.T) {
 		e.propertyLock.Unlock()
 	}
 
+	_ = e.Theme()
 	test.Type(e, "abc123")
 	e.selectAll()
 	e.TypedKey(&fyne.KeyEvent{Name: fyne.KeyBackspace})
@@ -340,6 +346,7 @@ func TestEntry_PasteFromClipboard(t *testing.T) {
 	entry := NewEntry()
 
 	w := test.NewApp().NewWindow("")
+	defer w.Close()
 	w.SetContent(entry)
 
 	testContent := "test"
@@ -357,6 +364,7 @@ func TestEntry_PasteFromClipboard_MultilineWrapping(t *testing.T) {
 	entry.Wrapping = fyne.TextWrapWord
 
 	w := test.NewApp().NewWindow("")
+	defer w.Close()
 	w.SetContent(entry)
 	w.Resize(fyne.NewSize(108, 64))
 
@@ -385,7 +393,7 @@ func TestEntry_PlaceholderTextStyle(t *testing.T) {
 	e := NewEntry()
 	e.TextStyle = fyne.TextStyle{Bold: true, Italic: true}
 
-	w := test.NewWindow(e)
+	w := test.NewTempWindow(t, e)
 	assert.Equal(t, e.TextStyle, e.placeholder.Segments[0].(*TextSegment).Style.TextStyle)
 
 	w.Canvas().Focus(e)
@@ -397,12 +405,13 @@ func TestEntry_Tab(t *testing.T) {
 	e.TextStyle.Monospace = true
 	e.SetText("a\n\tb\nc")
 
+	_ = e.Theme()
 	r := cache.Renderer(e.textProvider()).(*textRenderer)
 	assert.Equal(t, 3, len(r.Objects()))
 	assert.Equal(t, "a", r.Objects()[0].(*canvas.Text).Text)
 	assert.Equal(t, "\tb", r.Objects()[1].(*canvas.Text).Text)
 
-	w := test.NewWindow(e)
+	w := test.NewTempWindow(t, e)
 	w.Resize(fyne.NewSize(86, 86))
 	w.Canvas().Focus(e)
 	test.AssertImageMatches(t, "entry/tab-content.png", w.Canvas().Capture())
@@ -421,7 +430,7 @@ func TestEntry_TabSelection(t *testing.T) {
 
 	assert.Equal(t, "\tb", e.SelectedText())
 
-	w := test.NewWindow(e)
+	w := test.NewTempWindow(t, e)
 	w.Resize(fyne.NewSize(86, 86))
 	w.Canvas().Focus(e)
 	test.AssertImageMatches(t, "entry/tab-select.png", w.Canvas().Capture())

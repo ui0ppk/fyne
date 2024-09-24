@@ -65,9 +65,8 @@ func TestButton_Tapped(t *testing.T) {
 }
 
 func TestButton_Disable(t *testing.T) {
-	test.NewApp()
-	defer test.NewApp()
-	test.ApplyTheme(t, theme.LightTheme())
+	test.NewTempApp(t)
+	test.ApplyTheme(t, test.Theme())
 
 	tapped := false
 	button := widget.NewButtonWithIcon("Test", theme.HomeIcon(), func() {
@@ -122,8 +121,7 @@ func TestButton_Disabled(t *testing.T) {
 }
 
 func TestButton_LowImportance(t *testing.T) {
-	test.NewApp()
-	defer test.NewApp()
+	test.NewTempApp(t)
 
 	b := &widget.Button{Text: "Text", Icon: theme.HomeIcon(), Importance: widget.LowImportance}
 	w := test.NewWindow(b)
@@ -136,9 +134,8 @@ func TestButton_LowImportance(t *testing.T) {
 }
 
 func TestButton_Hover(t *testing.T) {
-	test.NewApp()
-	defer test.NewApp()
-	test.ApplyTheme(t, theme.LightTheme())
+	test.NewTempApp(t)
+	test.ApplyTheme(t, test.Theme())
 
 	b := widget.NewButtonWithIcon("Test", theme.HomeIcon(), func() {})
 	w := test.NewWindow(b)
@@ -165,8 +162,7 @@ func TestButton_Hover(t *testing.T) {
 }
 
 func TestButton_Layout(t *testing.T) {
-	test.NewApp()
-	defer test.NewApp()
+	test.NewTempApp(t)
 
 	for name, tt := range map[string]struct {
 		text      string
@@ -293,8 +289,7 @@ func TestButton_Layout(t *testing.T) {
 }
 
 func TestButton_ChangeTheme(t *testing.T) {
-	test.NewApp()
-	defer test.NewApp()
+	test.NewTempApp(t)
 
 	b := widget.NewButton("Test", func() {})
 	w := test.NewWindow(b)
@@ -322,9 +317,8 @@ func TestButtonCompatImportance(t *testing.T) {
 }
 
 func TestButtonSuccess(t *testing.T) {
-	test.NewApp()
-	defer test.NewApp()
-	test.ApplyTheme(t, theme.LightTheme())
+	test.NewTempApp(t)
+	test.ApplyTheme(t, test.Theme())
 
 	b := widget.NewButtonWithIcon("Test", theme.HomeIcon(), func() {})
 	w := test.NewWindow(b)

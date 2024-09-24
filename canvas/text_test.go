@@ -1,6 +1,7 @@
 package canvas_test
 
 import (
+	"image"
 	"image/color"
 	"testing"
 
@@ -11,6 +12,22 @@ import (
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestText_FontSource(t *testing.T) {
+	text := canvas.NewText("Test", color.NRGBA{0, 0, 0, 0xff})
+	c := test.NewWindow(text).Canvas()
+
+	text.FontSource = test.Theme().Font(fyne.TextStyle{Bold: true})
+	img1 := c.Capture()
+	text.FontSource = test.Theme().Font(fyne.TextStyle{Italic: true})
+	img2 := c.Capture()
+	assert.NotEqual(t, img1.(*image.NRGBA).Pix, img2.(*image.NRGBA).Pix)
+
+	text.FontSource = fyne.NewStaticResource("corrupt", []byte{})
+	assert.NotPanics(t, func() {
+		test.NewWindow(text).Canvas().Capture()
+	})
+}
 
 func TestText_MinSize(t *testing.T) {
 	text := canvas.NewText("Test", color.NRGBA{0, 0, 0, 0xff})
@@ -35,8 +52,7 @@ func TestText_MinSize_NoMultiLine(t *testing.T) {
 }
 
 func TestText_Layout(t *testing.T) {
-	test.NewApp()
-	defer test.NewApp()
+	test.NewTempApp(t)
 
 	for name, tt := range map[string]struct {
 		text  string
@@ -105,7 +121,7 @@ func TestText_Layout(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			text := canvas.NewText(tt.text, theme.ForegroundColor())
+			text := canvas.NewText(tt.text, theme.Color(theme.ColorNameForeground))
 			text.Alignment = tt.align
 			text.Resize(tt.size)
 
@@ -115,8 +131,7 @@ func TestText_Layout(t *testing.T) {
 }
 
 func TestText_CarriageReturn(t *testing.T) {
-	test.NewApp()
-	defer test.NewApp()
+	test.NewTempApp(t)
 
 	for name, tt := range map[string]struct {
 		text  string
@@ -185,7 +200,7 @@ func TestText_CarriageReturn(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			text := canvas.NewText(tt.text, theme.ForegroundColor())
+			text := canvas.NewText(tt.text, theme.Color(theme.ColorNameForeground))
 			text.Alignment = tt.align
 			text.Resize(tt.size)
 

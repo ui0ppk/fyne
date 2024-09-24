@@ -84,11 +84,12 @@ func CleanCanvas(canvas fyne.Canvas) {
 		if !ok {
 			continue
 		}
-		winfo, ok := renderers[wid]
+		rinfo, ok := renderers[wid]
 		if !ok {
 			continue
 		}
-		winfo.renderer.Destroy()
+		rinfo.renderer.Destroy()
+		overrides.Delete(wid)
 		delete(renderers, wid)
 	}
 	renderersLock.Unlock()
@@ -135,13 +136,12 @@ func CleanCanvases(refreshingCanvases []fyne.Canvas) {
 			continue
 		}
 		rinfo, ok := renderers[wid]
-		if !ok {
+		if !ok || !rinfo.isExpired(now) {
 			continue
 		}
-		if rinfo.isExpired(now) {
-			rinfo.renderer.Destroy()
-			delete(renderers, wid)
-		}
+		rinfo.renderer.Destroy()
+		overrides.Delete(wid)
+		delete(renderers, wid)
 	}
 	renderersLock.Unlock()
 	lastClean = timeNow()
@@ -149,13 +149,13 @@ func CleanCanvases(refreshingCanvases []fyne.Canvas) {
 
 // ResetThemeCaches clears all the svg and text size cache maps
 func ResetThemeCaches() {
-	svgs.Range(func(key, value interface{}) bool {
+	svgs.Range(func(key, value any) bool {
 		svgs.Delete(key)
 		return true
 	})
 
 	fontSizeLock.Lock()
-	fontSizeCache = map[fontSizeEntry]fontMetric{}
+	fontSizeCache = map[fontSizeEntry]*fontMetric{}
 	fontSizeLock.Unlock()
 }
 
@@ -187,6 +187,7 @@ func destroyExpiredRenderers(now time.Time) {
 	for wid, rinfo := range renderers {
 		if rinfo.isExpired(now) {
 			rinfo.renderer.Destroy()
+			overrides.Delete(wid)
 			expiredObjects = append(expiredObjects, wid)
 		}
 	}
@@ -215,7 +216,7 @@ func matchesACanvas(cinfo *canvasInfo, canvases []fyne.Canvas) bool {
 }
 
 type expiringCache struct {
-	expires atomic.Value // time.Time
+	expires atomic.Pointer[time.Time]
 }
 
 // isExpired check if the cache data is expired.
@@ -224,12 +225,13 @@ func (c *expiringCache) isExpired(now time.Time) bool {
 	if t == nil {
 		return (time.Time{}).Before(now)
 	}
-	return t.(time.Time).Before(now)
+	return (*t).Before(now)
 }
 
 // setAlive updates expiration time.
 func (c *expiringCache) setAlive() {
-	c.expires.Store(timeNow().Add(cacheDuration))
+	time := timeNow().Add(cacheDuration)
+	c.expires.Store(&time)
 }
 
 type expiringCacheNoLock struct {

@@ -17,7 +17,7 @@ func loadPreferences(id string) *preferences {
 
 func TestPreferences_Remove(t *testing.T) {
 	p := loadPreferences("dummy")
-	p.WriteValues(func(val map[string]interface{}) {
+	p.WriteValues(func(val map[string]any) {
 		val["keyString"] = "value"
 		val["keyInt"] = 4
 	})
@@ -34,7 +34,7 @@ func TestPreferences_Remove(t *testing.T) {
 
 func TestPreferences_Save(t *testing.T) {
 	p := loadPreferences("dummy")
-	p.WriteValues(func(val map[string]interface{}) {
+	p.WriteValues(func(val map[string]any) {
 		val["keyString"] = "value"
 		val["keyStringList"] = []string{"1", "2", "3"}
 		val["keyInt"] = 4
@@ -68,15 +68,14 @@ func TestPreferences_Save(t *testing.T) {
 
 func TestPreferences_Save_OverwriteFast(t *testing.T) {
 	p := loadPreferences("dummy2")
-	p.WriteValues(func(val map[string]interface{}) {
+	p.WriteValues(func(val map[string]any) {
 		val["key"] = "value"
 	})
 
-	path := filepath.Join(os.TempDir(), "fynePrefs2.json")
-	defer os.Remove(path)
+	path := filepath.Join(t.TempDir(), "fynePrefs2.json")
 	p.saveToFile(path)
 
-	p.WriteValues(func(val map[string]interface{}) {
+	p.WriteValues(func(val map[string]any) {
 		val["key2"] = "value2"
 	})
 	p.saveToFile(path)

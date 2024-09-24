@@ -70,10 +70,10 @@ func checkerPattern(x, y, _, _ int) color.Color {
 	y /= 20
 
 	if x%2 == y%2 {
-		return theme.BackgroundColor()
+		return theme.Color(theme.ColorNameBackground)
 	}
 
-	return theme.ShadowColor()
+	return theme.Color(theme.ColorNameShadow)
 }
 
 func iconList(icons []iconInfo) []string {
@@ -94,8 +94,10 @@ func loadIcons() []iconInfo {
 		{"SearchReplaceIcon", theme.SearchReplaceIcon()},
 
 		{"CheckButtonIcon", theme.CheckButtonIcon()},
+		{"CheckButtonFillIcon", theme.CheckButtonFillIcon()},
 		{"CheckButtonCheckedIcon", theme.CheckButtonCheckedIcon()},
 		{"RadioButtonIcon", theme.RadioButtonIcon()},
+		{"RadioButtonFillIcon", theme.RadioButtonFillIcon()},
 		{"RadioButtonCheckedIcon", theme.RadioButtonCheckedIcon()},
 
 		{"ColorAchromaticIcon", theme.ColorAchromaticIcon()},

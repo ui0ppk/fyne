@@ -1,9 +1,10 @@
 //go:build !no_glfw && !no_native_menus && !mobile
-// +build !no_glfw,!no_native_menus,!mobile
 
 package glfw
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"unsafe"
 
@@ -41,7 +42,8 @@ func TestDarwinMenu(t *testing.T) {
 	itemRecent := fyne.NewMenuItem("Recent", nil)
 	itemFoo := fyne.NewMenuItem("Foo", func() { lastAction = "foo" })
 	itemRecent.ChildMenu = fyne.NewMenu("", itemFoo)
-	menuEdit := fyne.NewMenu("File", itemNew, itemOpen, fyne.NewMenuItemSeparator(), itemRecent)
+	itemAbout := fyne.NewMenuItem("About", func() { lastAction = "about" })
+	menuFile := fyne.NewMenu("File", itemNew, itemOpen, fyne.NewMenuItemSeparator(), itemRecent, itemAbout)
 
 	itemHelp := fyne.NewMenuItem("Help", func() { lastAction = "Help!!!" })
 	itemHelp.Shortcut = &desktop.CustomShortcut{KeyName: fyne.KeyH, Modifier: fyne.KeyModifierControl}
@@ -60,7 +62,7 @@ func TestDarwinMenu(t *testing.T) {
 	itemMoreSetings := fyne.NewMenuItem("Settings…", func() { lastAction = "more settings" })
 	menuSettings := fyne.NewMenu("Settings", itemSettings, fyne.NewMenuItemSeparator(), itemMoreSetings)
 
-	mainMenu := fyne.NewMainMenu(menuEdit, menuHelp, menuMore, menuSettings)
+	mainMenu := fyne.NewMainMenu(menuFile, menuHelp, menuMore, menuSettings)
 	runOnMain(func() {
 		setupNativeMenu(w, mainMenu)
 	})
@@ -71,7 +73,9 @@ func TestDarwinMenu(t *testing.T) {
 	assert.Equal(t, 5, testNSMenuNumberOfItems(mm), "two built-in + three custom")
 
 	m := testNSMenuItemSubmenu(testNSMenuItemAtIndex(mm, 0))
-	assert.Equal(t, "", testNSMenuTitle(m), "app menu doesn’t have a title")
+	assert.Equal(t, "", testNSMenuTitle(m), "app menu doesn't have a title")
+	assertNSMenuItem(t, "About "+filepath.Base(os.Args[0]), "", 0, m, 0)
+	assertLastAction("about")
 	assertNSMenuItemSeparator(m, 1)
 	assertNSMenuItem(t, "Preferences", "", 0, m, 2)
 	assertLastAction("prefs")

@@ -1,5 +1,4 @@
 //go:build ignore
-// +build ignore
 
 package main
 
@@ -122,7 +121,7 @@ type prefBound{{ .Name }} struct {
 	base
 	key   string
 	p     fyne.Preferences
-	cache atomic.Value // {{ .Type }}
+	cache atomic.Pointer[{{ .Type }}]
 }
 
 // BindPreference{{ .Name }} returns a bindable {{ .Type }} value that is managed by the application preferences.
@@ -148,7 +147,7 @@ func BindPreference{{ .Name }}(key string, p fyne.Preferences) {{ .Name }} {
 
 func (b *prefBound{{ .Name }}) Get() ({{ .Type }}, error) {
 	cache := b.p.{{ .Name }}(b.key)
-	b.cache.Store(cache)
+	b.cache.Store(&cache)
 	return cache, nil
 }
 
@@ -163,11 +162,8 @@ func (b *prefBound{{ .Name }}) Set(v {{ .Type }}) error {
 
 func (b *prefBound{{ .Name }}) checkForChange() {
 	val := b.cache.Load()
-	if val != nil {
-		cache := val.({{ .Type }})
-		if b.p.{{ .Name }}(b.key) == cache {
-			return
-		}
+	if val != nil && b.p.{{ .Name }}(b.key) == *val {
+		return
 	}
 	b.trigger()
 }
@@ -274,7 +270,105 @@ func (s *stringFrom{{ .Name }}) DataChanged() {
 	s.trigger()
 }
 `
+const toIntTemplate = `
+type intFrom{{ .Name }} struct {
+	base
+	from {{ .Name }}
+}
 
+// {{ .Name }}ToInt creates a binding that connects a {{ .Name }} data item to an Int.
+//
+// Since: 2.5
+func {{ .Name }}ToInt(v {{ .Name }}) Int {
+	i := &intFrom{{ .Name }}{from: v}
+	v.AddListener(i)
+	return i
+}
+
+func (s *intFrom{{ .Name }}) Get() (int, error) {
+	val, err := s.from.Get()
+	if err != nil {
+		return 0, err
+	}
+	return {{ .ToInt }}(val)
+}
+
+func (s *intFrom{{ .Name }}) Set(v int) error {
+	val, err := {{ .FromInt }}(v)
+	if err != nil {
+		return err
+	}
+
+	old, err := s.from.Get()
+	if err != nil {
+		return err
+	}
+	if val == old {
+		return nil
+	}
+	if err = s.from.Set(val); err != nil {
+		return err
+	}
+
+	s.DataChanged()
+	return nil
+}
+
+func (s *intFrom{{ .Name }}) DataChanged() {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	s.trigger()
+}
+`
+const fromIntTemplate = `
+type intTo{{ .Name }} struct {
+	base
+	from Int
+}
+
+// IntTo{{ .Name }} creates a binding that connects an Int data item to a {{ .Name }}.
+//
+// Since: 2.5
+func IntTo{{ .Name }}(val Int) {{ .Name }} {
+	v := &intTo{{ .Name }}{from: val}
+	val.AddListener(v)
+	return v
+}
+
+func (s *intTo{{ .Name }}) Get() ({{ .Type }}, error) {
+	val, err := s.from.Get()
+	if err != nil {
+		return {{ .Default }}, err
+	}
+	return {{ .FromInt }}(val)
+}
+
+func (s *intTo{{ .Name }}) Set(val {{ .Type }}) error {
+	i, err := {{ .ToInt }}(val)
+	if err != nil {
+		return err
+	}
+	old, err := s.from.Get()
+	if i == old {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if err = s.from.Set(i); err != nil {
+		return err
+	}
+
+	s.DataChanged()
+	return nil
+}
+
+func (s *intTo{{ .Name }}) DataChanged() {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	s.trigger()
+}
+`
 const fromStringTemplate = `
 type stringTo{{ .Name }} struct {
 	base
@@ -385,6 +479,7 @@ type {{ .Name }}List interface {
 	Get() ([]{{ .Type }}, error)
 	GetValue(index int) ({{ .Type }}, error)
 	Prepend(value {{ .Type }}) error
+	Remove(value {{ .Type }}) error
 	Set(list []{{ .Type }}) error
 	SetValue(index int, value {{ .Type }}) error
 }
@@ -468,6 +563,55 @@ func (l *bound{{ .Name }}List) Prepend(val {{ .Type }}) error {
 func (l *bound{{ .Name }}List) Reload() error {
 	l.lock.Lock()
 	defer l.lock.Unlock()
+
+	return l.doReload()
+}
+
+// Remove takes the specified {{ .Type }} out of the list.
+//
+// Since: 2.5
+func (l *bound{{ .Name }}List) Remove(val {{ .Type }}) error {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+
+	v := *l.val
+	if len(v) == 0 {
+		return nil
+	}
+
+	{{- if eq .Comparator "" }}
+	if v[0] == val {
+		*l.val = v[1:]
+	} else if v[len(v)-1] == val {
+		*l.val = v[:len(v)-1]
+	} else {
+	{{- else }}
+	if {{ .Comparator }}(v[0], val) {
+		*l.val = v[1:]
+	} else if {{ .Comparator }}(v[len(v)-1], val) {
+		*l.val = v[:len(v)-1]
+	} else {
+	{{- end }}
+		id := -1
+		for i, v := range v {
+		{{- if eq .Comparator "" }}
+			if v == val {
+				id = i
+				break
+			}
+		{{- else }}
+			if {{ .Comparator }}(v, val) {
+				id = i
+				break
+			}
+		{{- end }}
+		}
+
+		if id == -1 {
+			return nil
+		}
+		*l.val = append(v[:id], v[id+1:]...)
+	}
 
 	return l.doReload()
 }
@@ -607,7 +751,11 @@ func (b *boundExternal{{ .Name }}ListItem) setIfChanged(val {{ .Type }}) error {
 const treeBindTemplate = `
 // {{ .Name }}Tree supports binding a tree of {{ .Type }} values.
 //
+{{ if eq .Name "Untyped" -}}
+// Since: 2.5
+{{- else -}}
 // Since: 2.4
+{{- end }}
 type {{ .Name }}Tree interface {
 	DataTree
 
@@ -615,13 +763,18 @@ type {{ .Name }}Tree interface {
 	Get() (map[string][]string, map[string]{{ .Type }}, error)
 	GetValue(id string) ({{ .Type }}, error)
 	Prepend(parent, id string, value {{ .Type }}) error
+	Remove(id string) error
 	Set(ids map[string][]string, values map[string]{{ .Type }}) error
 	SetValue(id string, value {{ .Type }}) error
 }
 
 // External{{ .Name }}Tree supports binding a tree of {{ .Type }} values from an external variable.
 //
+{{ if eq .Name "Untyped" -}}
+// Since: 2.5
+{{- else -}}
 // Since: 2.4
+{{- end }}
 type External{{ .Name }}Tree interface {
 	{{ .Name }}Tree
 
@@ -630,7 +783,11 @@ type External{{ .Name }}Tree interface {
 
 // New{{ .Name }}Tree returns a bindable tree of {{ .Type }} values.
 //
+{{ if eq .Name "Untyped" -}}
+// Since: 2.5
+{{- else -}}
 // Since: 2.4
+{{- end }}
 func New{{ .Name }}Tree() {{ .Name }}Tree {
 	t := &bound{{ .Name }}Tree{val: &map[string]{{ .Type }}{}}
 	t.ids = make(map[string][]string)
@@ -714,6 +871,32 @@ func (t *bound{{ .Name }}Tree) Prepend(parent, id string, val {{ .Type }}) error
 	v[id] = val
 
 	return t.doReload()
+}
+
+// Remove takes the specified id out of the tree.
+// It will also remove any child items from the data structure.
+//
+// Since: 2.5
+func (t *bound{{ .Name }}Tree) Remove(id string) error {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	t.removeChildren(id)
+	delete(t.ids, id)
+	v := *t.val
+	delete(v, id)
+
+	return t.doReload()
+}
+
+func (t *bound{{ .Name }}Tree) removeChildren(id string) {
+	for _, cid := range t.ids[id] {
+		t.removeChildren(cid)
+
+		delete(t.ids, cid)
+		v := *t.val
+		delete(v, cid)
+	}
 }
 
 func (t *bound{{ .Name }}Tree) Reload() error {
@@ -876,6 +1059,7 @@ type bindValues struct {
 	SupportsPreferences  bool
 	FromString, ToString string // function names...
 	Comparator           string // comparator function name
+	FromInt, ToInt       string // function names...
 }
 
 func newFile(name string) (*os.File, error) {
@@ -896,7 +1080,7 @@ package binding
 	return f, nil
 }
 
-func writeFile(f *os.File, t *template.Template, d interface{}) {
+func writeFile(f *os.File, t *template.Template, d any) {
 	if err := t.Execute(f, d); err != nil {
 		fyne.LogError("Unable to write file "+f.Name(), err)
 	}
@@ -926,6 +1110,14 @@ import (
 
 	"fyne.io/fyne/v2"
 )
+
+func internalFloatToInt(val float64) (int, error) {
+	return int(val), nil
+}
+
+func internalIntToFloat(val int) (float64, error) {
+	return float64(val), nil
+}
 `)
 	prefFile, err := newFile("preference")
 	if err != nil {
@@ -970,19 +1162,21 @@ import (
 
 	item := template.Must(template.New("item").Parse(itemBindTemplate))
 	fromString := template.Must(template.New("fromString").Parse(fromStringTemplate))
+	fromInt := template.Must(template.New("fromInt").Parse(fromIntTemplate))
+	toInt := template.Must(template.New("toInt").Parse(toIntTemplate))
 	toString := template.Must(template.New("toString").Parse(toStringTemplate))
 	preference := template.Must(template.New("preference").Parse(prefTemplate))
 	list := template.Must(template.New("list").Parse(listBindTemplate))
 	tree := template.Must(template.New("tree").Parse(treeBindTemplate))
 	binds := []bindValues{
-		bindValues{Name: "Bool", Type: "bool", Default: "false", Format: "%t", SupportsPreferences: true},
-		bindValues{Name: "Bytes", Type: "[]byte", Default: "nil", Since: "2.2", Comparator: "bytes.Equal"},
-		bindValues{Name: "Float", Type: "float64", Default: "0.0", Format: "%f", SupportsPreferences: true},
-		bindValues{Name: "Int", Type: "int", Default: "0", Format: "%d", SupportsPreferences: true},
-		bindValues{Name: "Rune", Type: "rune", Default: "rune(0)"},
-		bindValues{Name: "String", Type: "string", Default: "\"\"", SupportsPreferences: true},
-		bindValues{Name: "Untyped", Type: "interface{}", Default: "nil", Since: "2.1"},
-		bindValues{Name: "URI", Type: "fyne.URI", Default: "fyne.URI(nil)", Since: "2.1",
+		{Name: "Bool", Type: "bool", Default: "false", Format: "%t", SupportsPreferences: true},
+		{Name: "Bytes", Type: "[]byte", Default: "nil", Since: "2.2", Comparator: "bytes.Equal"},
+		{Name: "Float", Type: "float64", Default: "0.0", Format: "%f", SupportsPreferences: true, ToInt: "internalFloatToInt", FromInt: "internalIntToFloat"},
+		{Name: "Int", Type: "int", Default: "0", Format: "%d", SupportsPreferences: true},
+		{Name: "Rune", Type: "rune", Default: "rune(0)"},
+		{Name: "String", Type: "string", Default: "\"\"", SupportsPreferences: true},
+		{Name: "Untyped", Type: "any", Default: "nil", Since: "2.1"},
+		{Name: "URI", Type: "fyne.URI", Default: "fyne.URI(nil)", Since: "2.1",
 			FromString: "uriFromString", ToString: "uriToString", Comparator: "compareURI"},
 	}
 	for _, b := range binds {
@@ -991,13 +1185,9 @@ import (
 		}
 
 		writeFile(listFile, list, b)
-		if b.Name == "Untyped" {
-			continue // interface{} is special, we have it in binding.go instead
-		}
-
 		writeFile(treeFile, tree, b)
 		if b.Name == "Untyped" {
-			continue // interface{} is special, we have it in binding.go instead
+			continue // any is special, we have it in binding.go instead
 		}
 
 		writeFile(itemFile, item, b)
@@ -1006,6 +1196,12 @@ import (
 		}
 		if b.Format != "" || b.ToString != "" {
 			writeFile(convertFile, toString, b)
+		}
+		if b.FromInt != "" {
+			writeFile(convertFile, fromInt, b)
+		}
+		if b.ToInt != "" {
+			writeFile(convertFile, toInt, b)
 		}
 	}
 	// add StringTo... at the bottom of the convertFile for correct ordering
